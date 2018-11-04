@@ -1,0 +1,60 @@
+language: scala
+scala: 2.12.6
+jdk: oraclejdk8
+
+stages:
+  - name: test
+  - name: publish
+    if: NOT type = pull_request
+
+cache:
+  directories:
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt
+    - $HOME/.coursier/cache
+    - '.hoarder-cache'
+
+env:
+  global:
+    - COURSIER_PROGRESS=0
+    - SBT=./sbt
+    # ENCRYPTION_PASSWORD
+    - secure: ...
+    # GITHUB_TOKEN
+    - secure: ...
+    # GITHUB_ACCESS_TOKEN
+    - secure: ...
+    # DISCORD_WEBHOOK_TOKENS
+    - secure: ...
+
+jobs:
+  include:
+    - stage: test
+      script:
+        - set -e
+        - $SBT ++$TRAVIS_SCALA_VERSION test
+
+    - stage: publish
+      env:
+      script:
+        - set -e
+        - $SBT transferPublishAndTagResources
+        - TRAVIS_JOB_NUMBER=1 scripts/publishAndTag 'slamdata/fs2-gzip'
+
+      git:
+        depth: false
+
+after_success:
+  - scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
+
+after_failure:
+  - scripts/discordTravisPost failure https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
+
+branches:
+  only:
+    - master
+    - /^backport.*$/
+
+before_cache:
+  - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
+  - find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
