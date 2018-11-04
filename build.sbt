@@ -1,7 +1,6 @@
 import scala.collection.Seq
 
 performMavenCentralSync in ThisBuild := false   // basically just ignores all the sonatype sync parts of things
-
 publishAsOSSProject in ThisBuild := true
 
 homepage in ThisBuild := Some(url("https://github.com/slamdata/fs2-gzip"))
@@ -24,7 +23,7 @@ lazy val core = project
   .in(file("core"))
   .settings(name := "fs2-gzip")
   .settings(
-    /*
-    libraryDependencies += ...
-     */)
+     libraryDependencies += "co.fs2" %% "fs2-core" % "1.0.0",
+
+     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
   .enablePlugins(AutomateHeaderPlugin)
