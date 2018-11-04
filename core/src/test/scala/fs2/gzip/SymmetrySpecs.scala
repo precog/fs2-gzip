@@ -103,6 +103,25 @@ object SymmetrySpecs extends Specification with ThrownMessages {
       }
     }
 
+    "compress with gzip and then decompress with prime chunk sizes (decompression MUCH smaller)" in {
+      if ((stringToProcess("which gzip") ! ProcessLogger(_ => (), _ => ())) == 0) {
+        val scratchgz = File.createTempFile("SymmetrySpecs-gzip-then-decompress", "winnie.txt.gz")
+        ("gzip" #< (new File(TextFilePath)) #> scratchgz).! mustEqual 0
+
+        val lines =
+          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 5503)
+            .through(decompress[IO](719))
+            .through(text.utf8Decode)
+            .through(text.lines)
+            .compile.toList
+            .unsafeRunSync()
+
+        lines mustEqual TextFileLines
+      } else {
+        skip("gzip executable not found on this system")
+      }
+    }
+
     "compress with gzip and then decompress with prime chunk sizes (decompression larger)" in {
       if ((stringToProcess("which gzip") ! ProcessLogger(_ => (), _ => ())) == 0) {
         val scratchgz = File.createTempFile("SymmetrySpecs-gzip-then-decompress", "winnie.txt.gz")
