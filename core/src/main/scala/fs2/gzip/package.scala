@@ -112,10 +112,7 @@ package object gzip {
          * presumably the GZIP decompression algorithm needs a larger block in order to make
          * progress and the stream will halt with an error.
          */
-        @SuppressWarnings(
-          Array(
-            "org.wartremover.warts.AnyVal",
-            "org.wartremover.warts.Recursion"))
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def loop(in: Stream[F, Byte], leftover: Option[(Array[Byte], Int)]): Stream[F, Byte] = {
           Stream force {
             for {
@@ -172,7 +169,21 @@ package object gzip {
                     }
 
                   case None =>
-                    //
+                    // we finished with the input stream, so finish up leftover *and* buf and we're done
+                    if (leftover2.isDefined) {
+                      stepDecompress ++ loop(Stream.empty, leftover2)
+                    } else {
+                      lazy val stepAll: Stream[F, Byte] = Stream force {
+                        Sync[F] delay {
+                          if (bis.available() > 0)
+                            stepDecompress ++ stepAll
+                          else
+                            Stream.empty[F]
+                        }
+                      }
+
+                      stepAll
+                    }
                 }
 
                 mapped.stream.flatten
