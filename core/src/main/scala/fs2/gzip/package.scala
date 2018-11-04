@@ -30,19 +30,16 @@ package object gzip {
   // try to align initialBufferSize with your expected chunk size
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def compress[F[_]: Sync](initialBufferSize: Int = 8192): Pipe[F, Byte, Byte] = { in =>
-    val streams = for {
+    for {
       bos <- Stream.eval(Sync[F].delay(new ByteArrayOutputStream(initialBufferSize)))
 
       gzos <- Stream.bracket(Sync[F].delay(new GZIPOutputStream(bos))) { gzos =>
         Sync[F].delay(gzos.close())
       }
-    } yield (bos, gzos)
 
-    // not in the for-comprehension to avoid the identity map
-    streams flatMap {
-      case (bos, gzos) =>
-        in.chunks flatMap { chunk =>
-          val eff = for {
+      b <- in.chunks flatMap { chunk =>
+        Stream evalUnChunk {
+          for {
             _ <- Sync[F] delay {
               chunk match {
                 case Chunk.Bytes(values, off, len) =>
@@ -69,10 +66,9 @@ package object gzip {
               back
             }
           } yield Chunk.bytes(arr)
-
-          Stream.evalUnChunk(eff)
         }
-    }
+      }
+    } yield b
   }
 
   // try to align initialBufferSize with your expected chunk size
