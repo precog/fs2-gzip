@@ -33,11 +33,15 @@ package object gzip {
   def compress[F[_]: Sync](initialBufferSize: Int): Pipe[F, Byte, Byte] = { in =>
     for {
       bos <- Stream.eval(Sync[F].delay(new ByteArrayOutputStream(initialBufferSize)))
-      gzos <- Stream.bracket(Sync[F].delay(new GZIPOutputStream(bos, true))) { gzos =>
-        Sync[F].delay(gzos.close())
+      gzos <- Stream.eval(Sync[F].delay(new GZIPOutputStream(bos, true)))
+
+      slurpBytes = Sync[F] delay {
+        val back = bos.toByteArray
+        bos.reset()
+        back
       }
 
-      b <- in.chunks flatMap { chunk =>
+      body = in.chunks flatMap { chunk =>
         Stream evalUnChunk {
           for {
             _ <- Sync[F] delay {
@@ -60,14 +64,12 @@ package object gzip {
 
             _ <- Sync[F].delay(gzos.flush())    // eagerly flush on each chunk
 
-            arr <- Sync[F] delay {
-              val back = bos.toByteArray
-              bos.reset()
-              back
-            }
+            arr <- slurpBytes
           } yield Chunk.bytes(arr)
         }
       }
+
+      b <- body ++ Stream.eval_(Sync[F].delay(gzos.close())) ++ Stream.evalUnChunk(slurpBytes.map(Chunk.bytes(_)))
     } yield b
   }
 
