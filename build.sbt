@@ -9,10 +9,6 @@ scmInfo in ThisBuild := Some(ScmInfo(
   url("https://github.com/slamdata/fs2-gzip"),
   "scm:git@github.com:slamdata/fs2-gzip.git"))
 
-// Include to also publish a project's tests
-lazy val publishTestsSettings = Seq(
-  publishArtifact in (Test, packageBin) := true)
-
 lazy val root = project
   .in(file("."))
   .settings(noPublishSettings)
@@ -23,7 +19,9 @@ lazy val core = project
   .in(file("core"))
   .settings(name := "fs2-gzip")
   .settings(
-     libraryDependencies += "co.fs2" %% "fs2-core" % "1.0.0",
+     libraryDependencies ++= Seq(
+      "co.fs2"     %% "fs2-core"    % "1.0.0",
+      "org.specs2" %% "specs2-core" % "4.3.4" % "test"),
 
      addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
   .enablePlugins(AutomateHeaderPlugin)
