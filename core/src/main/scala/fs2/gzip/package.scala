@@ -96,10 +96,10 @@ package object gzip {
       def pageBeginning(in: Stream[F, Byte]): Pull[F, (GZIPInputStream, Stream[F, Byte]), Unit] = {
         in.pull.uncons flatMap {
           case Some((chunk, tail)) =>
-            val tryAcquire = Sync[F].delay(new GZIPInputStream(abis)).attempt   // GZIPInputStream has no resources, so we don't need to bracket
+            val tryAcquire = abis.checkpoint >> Sync[F].delay(new GZIPInputStream(abis)).attempt   // GZIPInputStream has no resources, so we don't need to bracket
             val createOrLoop = Pull.eval(tryAcquire) flatMap {
-              case Right(gzis) => Pull.output1((gzis, tail)) >> Pull.done
-              case Left(AsyncByteArrayInputStream.AsyncError) => pageBeginning(tail)
+              case Right(gzis) => Pull.output1((gzis, tail)) >> Pull.eval(abis.release) >> Pull.done
+              case Left(AsyncByteArrayInputStream.AsyncError) => Pull.eval(abis.restore) >> pageBeginning(tail)
               case Left(t) => Pull.raiseError(t)
             }
 

@@ -20,7 +20,8 @@ import cats.effect.Sync
 
 import scala.collection.mutable
 
-import scala.{math, Array, Boolean, Byte, Int}
+import scala.{math, Array, Boolean, Byte, Int, List, Unit}
+// import scala.{Predef, StringContext}, Predef._
 import scala.util.control.NoStackTrace
 
 import java.io.InputStream
@@ -31,14 +32,40 @@ import java.lang.{Error, SuppressWarnings, System}
  * exceptions. This will work so long as any delegating code (such as other InputStreams) perform
  * reads *before* changing any internal state. Reads that are interleaved with state changes may
  * result in invalid continuations.
- *
- * TODO we need checkpointing because not all reads are done in one shot (e.g. read(); read(); read();)
  */
-@SuppressWarnings(Array("org.wartremover.warts.Var"))
+@SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
 private[gzip] final class AsyncByteArrayInputStream[F[_]: Sync] private (val bound: Int) extends InputStream {
   private[this] val bytes = new mutable.ListBuffer[Array[Byte]]
   private[this] var headOffset = 0
   private[this] var _available = 0
+
+  // checkpoint
+  private[this] var cbytes: List[Array[Byte]] = _
+  private[this] var cheadOffset: Int = _
+  private[this] var cavailable: Int = _
+
+  def checkpoint: F[Unit] = {
+    Sync[F] delay {
+      cbytes = bytes.toList   // we can do better here, probably
+      cheadOffset = headOffset
+      cavailable = _available
+    }
+  }
+
+  def restore: F[Unit] = {
+    Sync[F] delay {
+      bytes.clear()
+      val _ = bytes ++= cbytes    // we can do a lot better here
+      headOffset = cheadOffset
+      _available = cavailable
+    }
+  }
+
+  def release: F[Unit] = {
+    Sync[F] delay {
+      cbytes = null
+    }
+  }
 
   def push(chunk: Array[Byte]): F[Boolean] = {
     Sync[F] delay {

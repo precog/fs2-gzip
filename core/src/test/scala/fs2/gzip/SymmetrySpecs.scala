@@ -38,6 +38,12 @@ object SymmetrySpecs extends Specification {
       input.through(decompress[IO](8192)).compile.toList.unsafeRunSync() mustEqual expected
     }
 
+    "decompress hard-coded gerrymandered bytes to simple result" in {
+      val input = Stream[IO, Byte](31, -117, 8, 0, 0, 0, 0, 0, 0, 0, 98, 100, 98, 102, 97, 5, 0, 0, 0, -1, -1).unchunk
+      val expected = List[Byte](1, 2, 3, 4, 5)
+      input.through(decompress[IO](8192)).compile.toList.unsafeRunSync() mustEqual expected
+    }
+
     "round-trip some simple bytes" in {
       val input = Stream[Pure, Byte](1, 2, 3, 4, 5)
       val output = input.through(compress[IO](8192)).through(decompress[IO](8192))
