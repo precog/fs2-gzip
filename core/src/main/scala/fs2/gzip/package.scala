@@ -115,7 +115,8 @@ package object gzip {
 
       pageBeginning(in).stream flatMap {
         case (gzis, in) =>
-          val stepDecompress = Stream force {
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+          lazy val stepDecompress: Stream[F, Byte] = Stream force {
             Sync[F] delay {
               val inner = new Array[Byte](bufferSize * 2)   // double the input buffer size since we're decompressing
 
@@ -126,28 +127,19 @@ package object gzip {
               }
 
               if (len > 0)
-                Stream.chunk(Chunk.bytes(inner, 0, len)).covary[F]
+                Stream.chunk(Chunk.bytes(inner, 0, len)).covary[F] ++ stepDecompress
               else
                 Stream.empty[F]
             }
           }
 
-          // drains abis through gzis
-          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-          lazy val repeatedlyDecompress: Stream[F, Byte] = Stream force {
-            Sync[F] delay {
-              if (abis.available() > 0)
-                stepDecompress ++ repeatedlyDecompress
-              else
-                Stream.empty[F]
-            }
-          }
-
+          // TODO: It is possible for this to fail with a non-progressive error
+          //       if `in` contains bytes in addition to the compressed data.
           val mainline = in.chunks flatMap { chunk =>
             Stream.eval_(push(chunk)) ++ stepDecompress
           }
 
-          mainline ++ repeatedlyDecompress
+          stepDecompress ++ mainline
       }
     }
   }
