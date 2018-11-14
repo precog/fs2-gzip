@@ -71,7 +71,7 @@ object SymmetrySpecs extends Specification with ThrownMessages {
 
         // nice equal block sizes; we can do better ^_^
         val lines =
-          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 4096)
+          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 512)
             .through(decompress[IO](4096))
             .through(text.utf8Decode)
             .through(text.lines)
@@ -90,8 +90,8 @@ object SymmetrySpecs extends Specification with ThrownMessages {
         ("gzip" #< (new File(TextFilePath)) #> scratchgz).! mustEqual 0
 
         val lines =
-          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 5503)
-            .through(decompress[IO](3323))
+          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 509)
+            .through(decompress[IO](311))
             .through(text.utf8Decode)
             .through(text.lines)
             .compile.toList
@@ -109,8 +109,8 @@ object SymmetrySpecs extends Specification with ThrownMessages {
         ("gzip" #< (new File(TextFilePath)) #> scratchgz).! mustEqual 0
 
         val lines =
-          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 5503)
-            .through(decompress[IO](719))
+          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 509)
+            .through(decompress[IO](83))
             .through(text.utf8Decode)
             .through(text.lines)
             .compile.toList
@@ -128,8 +128,8 @@ object SymmetrySpecs extends Specification with ThrownMessages {
         ("gzip" #< (new File(TextFilePath)) #> scratchgz).! mustEqual 0
 
         val lines =
-          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 5503)
-            .through(decompress[IO](9109))
+          io.file.readAll[IO](scratchgz.toPath, BlockingExecutionContext, 509)
+            .through(decompress[IO](1031))
             .through(text.utf8Decode)
             .through(text.lines)
             .compile.toList
@@ -146,8 +146,8 @@ object SymmetrySpecs extends Specification with ThrownMessages {
         val scratchgz = File.createTempFile("SymmetrySpecs-gzip-then-decompress", "winnie.txt.gz")
         val scratchtxt = File.createTempFile("SymmetrySpecs-gzip-then-decompress", "winnie.txt")
 
-        io.file.readAll[IO](new File(TextFilePath).toPath, BlockingExecutionContext, 4096)
-          .through(compress[IO](4096))
+        io.file.readAll[IO](new File(TextFilePath).toPath, BlockingExecutionContext, 509)
+          .through(compress[IO](509))
           .through(io.file.writeAll[IO](scratchgz.toPath, BlockingExecutionContext))
           .compile.drain.unsafeRunSync()
 
@@ -170,6 +170,19 @@ object SymmetrySpecs extends Specification with ThrownMessages {
       val input = Stream[Pure, Byte](1, 2, 3, 4, 5)
       val output = input.through(compress[IO](8192)).through(decompress[IO](8192))
       output.compile.toList.unsafeRunSync() mustEqual input.toList
+    }
+
+    "round-trip text file with small buffers" in {
+      val lines =
+        io.file.readAll[IO](new File(TextFilePath).toPath, BlockingExecutionContext, 1024)
+          .through(compress[IO](1024))
+          .through(decompress[IO](1024))
+          .through(text.utf8Decode)
+          .through(text.lines)
+          .compile.toList
+          .unsafeRunSync()
+
+      lines mustEqual TextFileLines
     }
   }
 }
