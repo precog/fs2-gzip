@@ -33,7 +33,7 @@ package object gzip {
   def compress[F[_]: Sync](initialBufferSize: Int): Pipe[F, Byte, Byte] = { in =>
     for {
       bos <- Stream.eval(Sync[F].delay(new ByteArrayOutputStream(initialBufferSize)))
-      gzos <- Stream.eval(Sync[F].delay(new GZIPOutputStream(bos, true)))
+      gzos <- Stream.eval(Sync[F].delay(new GZIPOutputStream(bos, initialBufferSize, true)))
 
       slurpBytes = Sync[F] delay {
         val back = bos.toByteArray
@@ -98,7 +98,7 @@ package object gzip {
       def pageBeginning(in: Stream[F, Byte]): Pull[F, (GZIPInputStream, Stream[F, Byte]), Unit] = {
         in.pull.uncons flatMap {
           case Some((chunk, tail)) =>
-            val tryAcquire = abis.checkpoint >> Sync[F].delay(new GZIPInputStream(abis)).attempt   // GZIPInputStream has no resources, so we don't need to bracket
+            val tryAcquire = abis.checkpoint >> Sync[F].delay(new GZIPInputStream(abis, bufferSize)).attempt   // GZIPInputStream has no resources, so we don't need to bracket
             val createOrLoop = Pull.eval(tryAcquire) flatMap {
               case Right(gzis) => Pull.output1((gzis, tail)) >> Pull.eval(abis.release) >> Pull.done
               case Left(AsyncByteArrayInputStream.AsyncError) => Pull.eval(abis.restore) >> pageBeginning(tail)
