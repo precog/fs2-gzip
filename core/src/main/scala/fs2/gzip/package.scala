@@ -33,7 +33,7 @@ package object gzip {
   def compress[F[_]: Sync](initialBufferSize: Int): Pipe[F, Byte, Byte] = { in =>
     for {
       bos <- Stream.eval(Sync[F].delay(new ByteArrayOutputStream(initialBufferSize)))
-      gzos <- Stream.eval(Sync[F].delay(new GZIPOutputStream(bos, true)))
+      gzos <- Stream.eval(Sync[F].delay(new GZIPOutputStream(bos, initialBufferSize, true)))
 
       slurpBytes = Sync[F] delay {
         val back = bos.toByteArray
@@ -73,6 +73,16 @@ package object gzip {
     } yield b
   }
 
+  // Like `compress`, but determines buffer size based on the first chunk of input.
+  def compressAdaptive[F[_]: Sync]: Pipe[F, Byte, Byte] =
+    _.pull.uncons.flatMap {
+      case Some((h, t)) =>
+        Pull.output1(t.cons(h).through(compress[F](h.size)))
+
+      case None =>
+        Pull.done
+    }.stream.flatten
+
   // try to align initialBufferSize with your expected chunk size
   // output chunks will be bounded by double this value
   def decompress[F[_]: Sync](bufferSize: Int): Pipe[F, Byte, Byte] = { in =>
@@ -98,7 +108,7 @@ package object gzip {
       def pageBeginning(in: Stream[F, Byte]): Pull[F, (GZIPInputStream, Stream[F, Byte]), Unit] = {
         in.pull.uncons flatMap {
           case Some((chunk, tail)) =>
-            val tryAcquire = abis.checkpoint >> Sync[F].delay(new GZIPInputStream(abis)).attempt   // GZIPInputStream has no resources, so we don't need to bracket
+            val tryAcquire = abis.checkpoint >> Sync[F].delay(new GZIPInputStream(abis, bufferSize)).attempt   // GZIPInputStream has no resources, so we don't need to bracket
             val createOrLoop = Pull.eval(tryAcquire) flatMap {
               case Right(gzis) => Pull.output1((gzis, tail)) >> Pull.eval(abis.release) >> Pull.done
               case Left(AsyncByteArrayInputStream.AsyncError) => Pull.eval(abis.restore) >> pageBeginning(tail)
@@ -143,4 +153,14 @@ package object gzip {
       }
     }
   }
+
+  // Like `decompress`, but determines buffer size based on the first chunk of input.
+  def decompressAdaptive[F[_]: Sync]: Pipe[F, Byte, Byte] =
+    _.pull.uncons.flatMap {
+      case Some((h, t)) =>
+        Pull.output1(t.cons(h).through(decompress[F](h.size)))
+
+      case None =>
+        Pull.done
+    }.stream.flatten
 }
