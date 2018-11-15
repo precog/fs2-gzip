@@ -73,6 +73,16 @@ package object gzip {
     } yield b
   }
 
+  // Like `compress`, but determines buffer size based on the first chunk of input.
+  def compressAdaptive[F[_]: Sync]: Pipe[F, Byte, Byte] =
+    _.pull.uncons.flatMap {
+      case Some((h, t)) =>
+        Pull.output1(t.cons(h).through(compress[F](h.size)))
+
+      case None =>
+        Pull.done
+    }.stream.flatten
+
   // try to align initialBufferSize with your expected chunk size
   // output chunks will be bounded by double this value
   def decompress[F[_]: Sync](bufferSize: Int): Pipe[F, Byte, Byte] = { in =>
@@ -143,4 +153,14 @@ package object gzip {
       }
     }
   }
+
+  // Like `decompress`, but determines buffer size based on the first chunk of input.
+  def decompressAdaptive[F[_]: Sync]: Pipe[F, Byte, Byte] =
+    _.pull.uncons.flatMap {
+      case Some((h, t)) =>
+        Pull.output1(t.cons(h).through(decompress[F](h.size)))
+
+      case None =>
+        Pull.done
+    }.stream.flatten
 }

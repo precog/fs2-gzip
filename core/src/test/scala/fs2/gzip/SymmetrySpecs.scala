@@ -184,5 +184,18 @@ object SymmetrySpecs extends Specification with ThrownMessages {
 
       lines mustEqual TextFileLines
     }
+
+    "round-trip text file with adaptive buffers" in {
+      val lines =
+        io.file.readAll[IO](new File(TextFilePath).toPath, BlockingExecutionContext, 512)
+          .through(compressAdaptive[IO])
+          .through(decompressAdaptive[IO])
+          .through(text.utf8Decode)
+          .through(text.lines)
+          .compile.toList
+          .unsafeRunSync()
+
+      lines mustEqual TextFileLines
+    }
   }
 }
