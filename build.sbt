@@ -1,6 +1,5 @@
 import scala.collection.Seq
 
-performMavenCentralSync in ThisBuild := false   // basically just ignores all the sonatype sync parts of things
 publishAsOSSProject in ThisBuild := true
 
 homepage in ThisBuild := Some(url("https://github.com/slamdata/fs2-gzip"))
