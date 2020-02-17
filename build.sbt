@@ -19,8 +19,8 @@ lazy val core = project
   .settings(name := "fs2-gzip")
   .settings(
      libraryDependencies ++= Seq(
-      "co.fs2"     %% "fs2-core"    % "1.0.0",
-      "co.fs2"     %% "fs2-io"      % "1.0.0" % "test",
+      "co.fs2"     %% "fs2-core"    % "2.2.2",
+      "co.fs2"     %% "fs2-io"      % "2.2.2" % "test",
       "org.specs2" %% "specs2-core" % "4.3.4" % "test"),
 
      addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
